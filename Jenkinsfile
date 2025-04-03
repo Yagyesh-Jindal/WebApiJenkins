@@ -3,13 +3,13 @@ pipeline {
     environment {
         AZURE_CREDENTIALS_ID = 'azure-service-principal'
         RESOURCE_GROUP = 'jecrc-YagyeshJindal-rg'
-        APP_SERVICE_NAME = 'webapijenkins84758'
+        APP_SERVICE_NAME = 'MyNewService'
     }
 
     stages {
         stage('Checkout Code') {
             steps {
-                git branch: 'master', url: 'https://github.com/Cloud-Authority/WebApiJenkins.git'
+                git branch: 'master', url: 'https://github.com/Yagyesh-Jindal/WebApiJenkins'
             }
         }
 
