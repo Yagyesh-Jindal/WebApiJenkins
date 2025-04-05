@@ -2,8 +2,8 @@ pipeline {
     agent any
     environment {
         AZURE_CREDENTIALS_ID = 'jenkins-pipeline-sp'
-        RESOURCE_GROUP = 'WebServicerg'
-        APP_SERVICE_NAME = 'jecrc-yagyesh'
+        RESOURCE_GROUP = 'WebServiceRG'
+        APP_SERVICE_NAME = 'jecrc-yagyesh-webapp'
         TF_WORKING_DIR='.'
     }
 
