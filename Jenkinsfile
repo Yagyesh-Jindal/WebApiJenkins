@@ -1,65 +1,92 @@
-// For terraform
 pipeline {
     agent any
-
     environment {
-        ARM_CLIENT_ID       = credentials('AZURE_CLIENT_ID')
-        ARM_CLIENT_SECRET   = credentials('AZURE_CLIENT_SECRET')
-        ARM_SUBSCRIPTION_ID = credentials('AZURE_SUBSCRIPTION_ID')
-        ARM_TENANT_ID       = credentials('AZURE_TENANT_ID')
+        AZURE_CREDENTIALS_ID = 'jenkins-pipeline-sp'
+        RESOURCE_GROUP = 'webservicerg'
+        APP_SERVICE_NAME = 'jecrc-yagyesh'
+        TF_WORKING_DIR='.'
     }
 
     stages {
-        stage('Checkout') {
+        stage('Checkout Code') {
             steps {
-                git url: 'https://github.com/Yagyesh-Jindal/WebApiJenkins.git', branch: 'master'
+                git branch: 'master', url: 'https://github.com/Yagyesh-Jindal/WebApiJenkins.git'
             }
         }
-
-        stage('Terraform Init') {
+         stage('Terraform Init') {
             steps {
-                bat 'terraform init'
-            }
-        }
-
-        stage('Terraform Plan') {
-            steps {
-                bat '''
-                    terraform plan ^
-                      -var client_id=%ARM_CLIENT_ID% ^
-                      -var client_secret=%ARM_CLIENT_SECRET% ^
-                      -var tenant_id=%ARM_TENANT_ID% ^
-                      -var subscription_id=%ARM_SUBSCRIPTION_ID%
-                    '''
-            }
-        }
-
-        stage('Terraform Apply') {
-            steps {
-                bat '''
-                terraform apply -auto-approve ^
-                  -var client_id=%ARM_CLIENT_ID% ^
-                  -var client_secret=%ARM_CLIENT_SECRET% ^
-                  -var tenant_id=%ARM_TENANT_ID% ^
-                  -var subscription_id=%ARM_SUBSCRIPTION_ID%
-                '''
-            }
-        }
-         stage('Build .NET App') {
-            steps {
-                dir('WebApiJenkins') { // Adjust to your .NET project folder
-                    bat 'dotnet publish -c Release -o publish'
+                withCredentials([azureServicePrincipal(credentialsId: AZURE_CREDENTIALS_ID)]) {
+                    bat """
+                    az login --service-principal -u %AZURE_CLIENT_ID% -p %AZURE_CLIENT_SECRET% --tenant %AZURE_TENANT_ID%
+                    echo "Checking Terraform Installation..."
+                    terraform -v
+                    echo "Navigating to Terraform Directory: $TF_WORKING_DIR"
+                    cd $TF_WORKING_DIR
+                    echo "Initializing Terraform..."
+                    terraform init
+                    """
                 }
             }
         }
 
-        stage('Deploy to Azure') {
+        stage('Terraform Plan') {
+    steps {
+        withCredentials([azureServicePrincipal(credentialsId: AZURE_CREDENTIALS_ID)]) {
+            bat """
+            az login --service-principal -u %AZURE_CLIENT_ID% -p %AZURE_CLIENT_SECRET% --tenant %AZURE_TENANT_ID%
+            echo "Navigating to Terraform Directory: %TF_WORKING_DIR%"
+            cd %TF_WORKING_DIR%
+            terraform plan -out=tfplan
+            """
+        }
+    }
+}
+
+
+        stage('Terraform Apply') {
+    steps {
+        withCredentials([azureServicePrincipal(credentialsId: AZURE_CREDENTIALS_ID)]) {
+            bat """
+            az login --service-principal -u %AZURE_CLIENT_ID% -p %AZURE_CLIENT_SECRET% --tenant %AZURE_TENANT_ID%
+            echo "Navigating to Terraform Directory: %TF_WORKING_DIR%"
+            cd %TF_WORKING_DIR%
+            echo "Applying Terraform Plan..."
+            terraform apply -auto-approve tfplan
+            """
+        }
+    }
+}
+
+    
+
+        stage('Build') {
             steps {
-                bat '''
-                powershell Compress-Archive -Path WebApiJenkins\\publish\\* -DestinationPath publish.zip -Force
-                az webapp deployment source config-zip --resource-group jenkins-yagyesh-rg --name jenkins-yagyesh-app123 --src publish.zip
-                '''
+                bat 'dotnet restore'
+                bat 'dotnet build --configuration Release'
+                bat 'dotnet publish -c Release -o ./publish'
             }
-        }   
+        }
+
+       stage('Deploy') {
+    steps {
+        withCredentials([azureServicePrincipal(credentialsId: AZURE_CREDENTIALS_ID)]) {
+            bat """
+            az login --service-principal -u %AZURE_CLIENT_ID% -p %AZURE_CLIENT_SECRET% --tenant %AZURE_TENANT_ID%
+            powershell Compress-Archive -Path ./publish/* -DestinationPath ./publish.zip -Force
+            az webapp deploy --resource-group %RESOURCE_GROUP% --name %APP_SERVICE_NAME% --src-path ./publish.zip --type zip
+            """
+        }
+    }
+}
+
+    }
+
+    post {
+        success {
+            echo 'Deployment Successful!'
+        }
+        failure {
+            echo 'Deployment Failed!'
+        }
     }
 }
