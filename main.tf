@@ -29,7 +29,7 @@ resource "azurerm_service_plan" "Web_plan" {
 
 }
 resource "azurerm_app_service" "web_app" {
-  name                = "jecrc-yagyesh-rg"
+  name                = "jecrc-yagyesh-webapp"
   location            = azurerm_resource_group.web_rg.location
   resource_group_name = azurerm_resource_group.web_rg.name
   app_service_plan_id = azurerm_service_plan.Web_plan.id
