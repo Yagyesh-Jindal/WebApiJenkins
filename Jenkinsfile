@@ -1,89 +1,68 @@
 pipeline {
     agent any
+
     environment {
         AZURE_CREDENTIALS_ID = 'jenkins-pipeline-sp'
-        RESOURCE_GROUP = 'WebServiceRG'
-        APP_SERVICE_NAME = 'jecrc-yagyesh-webapp'
-        TF_WORKING_DIR='.'
+        ACR_NAME = 'codecraftacr123'
+        ACR_LOGIN_SERVER = 'codecraftacr123.azurecr.io'
+        IMAGE_NAME = 'webapidocker1'
+        RESOURCE_GROUP = 'codecraft-rg'
+        CLUSTER_NAME = 'codecraft-aks'
+        K8S_NAMESPACE = 'default'
     }
 
     stages {
         stage('Checkout Code') {
             steps {
-                git branch: 'master', url: 'https://github.com/Yagyesh-Jindal/WebApiJenkins.git'
+                git branch: 'main', url: 'https://github.com/Yagyesh-Jindal/WebApiJenkins.git'
             }
         }
-         stage('Terraform Init') {
+
+        stage('Build Docker Image') {
             steps {
-                withCredentials([azureServicePrincipal(credentialsId: AZURE_CREDENTIALS_ID)]) {
-                    bat """
-                    az login --service-principal -u %AZURE_CLIENT_ID% -p %AZURE_CLIENT_SECRET% --tenant %AZURE_TENANT_ID%
-                    echo "Checking Terraform Installation..."
-                    terraform -v
-                    echo "Navigating to Terraform Directory: $TF_WORKING_DIR"
-                    cd $TF_WORKING_DIR
-                    echo "Initializing Terraform..."
-                    terraform init
-                    """
+                script {
+                    dockerImage = docker.build("${ACR_LOGIN_SERVER}/${IMAGE_NAME}:latest", "--file ./Dockerfile .")
                 }
             }
         }
 
-        stage('Terraform Plan') {
-    steps {
-        withCredentials([azureServicePrincipal(credentialsId: AZURE_CREDENTIALS_ID)]) {
-            bat """
-            az login --service-principal -u %AZURE_CLIENT_ID% -p %AZURE_CLIENT_SECRET% --tenant %AZURE_TENANT_ID%
-            echo "Navigating to Terraform Directory: %TF_WORKING_DIR%"
-            cd %TF_WORKING_DIR%
-            terraform plan -out=tfplan
-            """
-        }
-    }
-}
-
-
-        stage('Terraform Apply') {
-    steps {
-        withCredentials([azureServicePrincipal(credentialsId: AZURE_CREDENTIALS_ID)]) {
-            bat """
-            az login --service-principal -u %AZURE_CLIENT_ID% -p %AZURE_CLIENT_SECRET% --tenant %AZURE_TENANT_ID%
-            echo "Navigating to Terraform Directory: %TF_WORKING_DIR%"
-            cd %TF_WORKING_DIR%
-            echo "Applying Terraform Plan..."
-            terraform apply -auto-approve tfplan
-            """
-        }
-    }
-}
-
-    
-
-        stage('Build') {
+        stage('Login to ACR') {
             steps {
-                bat 'dotnet restore'
-                bat 'dotnet build --configuration Release'
-                bat 'dotnet publish -c Release -o ./publish'
+                withCredentials([azureServicePrincipal(credentialsId: AZURE_CREDENTIALS_ID)]) {
+                    sh '''
+                        az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET --tenant $AZURE_TENANT_ID
+                        az acr login --name $ACR_NAME
+                    '''
+                }
             }
         }
 
-       stage('Deploy') {
-    steps {
-        withCredentials([azureServicePrincipal(credentialsId: AZURE_CREDENTIALS_ID)]) {
-            bat """
-            az login --service-principal -u %AZURE_CLIENT_ID% -p %AZURE_CLIENT_SECRET% --tenant %AZURE_TENANT_ID%
-            powershell Compress-Archive -Path ./publish/* -DestinationPath ./publish.zip -Force
-            az webapp deploy --resource-group %RESOURCE_GROUP% --name %APP_SERVICE_NAME% --src-path ./publish.zip --type zip
-            """
+        stage('Push Image to ACR') {
+            steps {
+                script {
+                    docker.withRegistry("https://${ACR_LOGIN_SERVER}", '') {
+                        dockerImage.push('latest')
+                    }
+                }
+            }
         }
-    }
-}
 
+        stage('Deploy to AKS') {
+            steps {
+                withCredentials([azureServicePrincipal(credentialsId: AZURE_CREDENTIALS_ID)]) {
+                    sh '''
+                        az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET --tenant $AZURE_TENANT_ID
+                        az aks get-credentials --resource-group $RESOURCE_GROUP --name $CLUSTER_NAME --overwrite-existing
+                        kubectl apply -f ./k8s/
+                    '''
+                }
+            }
+        }
     }
 
     post {
         success {
-            echo 'Deployment Successful!'
+            echo 'Deployment to AKS Successful!'
         }
         failure {
             echo 'Deployment Failed!'
