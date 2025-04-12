@@ -14,9 +14,12 @@ spec:
     spec:
       containers:
       - name: dotnet-api
-        image: acrsid65764534.azurecr.io/webapidocker1:latest
+        image: codecraftacr123.azurecr.io/webapidocker1:latest
         ports:
-        - containerPort: 8080
+        - containerPort: 8089
+        imagePullPolicy: Always
+      imagePullSecrets:
+      - name: acr-auth
 ---
 apiVersion: v1
 kind: Service
@@ -29,4 +32,4 @@ spec:
   ports:
   - protocol: TCP
     port: 80
-    targetPort: 8080
+    targetPort: 8089
