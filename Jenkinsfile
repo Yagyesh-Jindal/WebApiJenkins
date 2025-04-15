@@ -19,6 +19,33 @@ pipeline {
             }
         }
 
+        stage('Terraform Init') {
+            steps {
+                withCredentials([azureServicePrincipal(credentialsId: AZURE_CREDENTIALS_ID)]) {
+                    sh '''
+                        az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET --tenant $AZURE_TENANT_ID
+                        cd $TF_WORKING_DIR
+                        terraform init
+                    '''
+                }
+            }
+        }
+
+        stage('Terraform Apply') {
+            steps {
+                withCredentials([azureServicePrincipal(credentialsId: AZURE_CREDENTIALS_ID)]) {
+                    sh '''
+                        cd $TF_WORKING_DIR
+                        terraform apply -auto-approve \
+                          -var="subscription_id=$AZURE_SUBSCRIPTION_ID" \
+                          -var="tenant_id=$AZURE_TENANT_ID" \
+                          -var="client_id=$AZURE_CLIENT_ID" \
+                          -var="client_secret=$AZURE_CLIENT_SECRET"
+                    '''
+                }
+            }
+        }
+
         stage('Build Docker Image') {
             steps {
                 script {
