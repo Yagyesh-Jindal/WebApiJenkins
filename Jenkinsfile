@@ -9,6 +9,7 @@ pipeline {
         RESOURCE_GROUP = 'codecraft-rg'
         CLUSTER_NAME = 'codecraft-aks'
         K8S_NAMESPACE = 'default'
+        TF_WORKING_DIR = '.'
     }
 
     stages {
