@@ -9,10 +9,14 @@ terraform {
 }
 
 provider "azurerm" {
-  subscription_id = "07a89969-c27b-4e15-be71-d02064b89cef"
-  tenant_id       = "b2b0fca2-b9c0-4158-8704-f6cc4fed6adb"
   features {}
+
+  subscription_id = var.subscription_id
+  tenant_id       = var.tenant_id
+  client_id       = var.client_id
+  client_secret   = var.client_secret
 }
+
 
 resource "azurerm_resource_group" "rg" {
   name     = "codecraft-rg"
