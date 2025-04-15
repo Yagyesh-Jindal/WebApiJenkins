@@ -8,10 +8,10 @@ USER app
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG configuration=Release
 WORKDIR /src
-COPY ["capgemini training/docker/WebApiJenkins/WebApiJenkins/WebApiJenkins.csproj", "capgemini training/docker/WebApiJenkins/WebApiJenkins/"]
-RUN dotnet restore "capgemini training/docker/WebApiJenkins/WebApiJenkins/WebApiJenkins.csproj"
+COPY ["WebApiJenkins/WebApiJenkins.csproj", "WebApiJenkins/"]
+RUN dotnet restore "WebApiJenkins/WebApiJenkins.csproj"
 COPY . .
-WORKDIR "/src/capgemini training/docker/WebApiJenkins/WebApiJenkins"
+WORKDIR "/src/WebApiJenkins"
 RUN dotnet build "WebApiJenkins.csproj" -c $configuration -o /app/build
 
 FROM build AS publish
